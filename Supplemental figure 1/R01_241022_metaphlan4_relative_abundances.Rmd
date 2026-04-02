@@ -1,0 +1,477 @@
+---
+title: "260401_KV_neonatalsepsis_metaphlan4_relative_abundance_barplots"
+author: "Jessica Tung, j.l.tung@wustl.edu"
+date: "2026-04-01"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+# Install and load in R packages
+```{r}
+library(ggplot2)
+library(dplyr)
+```
+
+# Set the root directory
+```{r}
+knitr::opts_knit$set(root.dir = "/Users/j.l.tung/GitHub/itsjesstung/Kp-maternal-vaccine-neonatal-sepsis/metaphlan4")
+```
+
+# Load in MetaPhlAn4 long data tables
+```{r}
+long_phyla   <- read.delim("/Users/j.l.tung/GitHub/itsjesstung/Kp-maternal-vaccine-neonatal-sepsis/metaphlan4/long_phyla.csv",   header = TRUE, sep = ',')
+long_class   <- read.delim("/Users/j.l.tung/GitHub/itsjesstung/Kp-maternal-vaccine-neonatal-sepsis/metaphlan4/long_class.csv",   header = TRUE, sep = ',')
+long_order   <- read.delim("/Users/j.l.tung/GitHub/itsjesstung/Kp-maternal-vaccine-neonatal-sepsis/metaphlan4long_order.csv",   header = TRUE, sep = ',')
+long_family  <- read.delim("/Users/j.l.tung/GitHub/itsjesstung/Kp-maternal-vaccine-neonatal-sepsis/metaphlan4/long_family.csv",  header = TRUE, sep = ',')
+long_genus   <- read.delim("/Users/j.l.tung/GitHub/itsjesstung/Kp-maternal-vaccine-neonatal-sepsis/metaphlan4/long_genus.csv",   header = TRUE, sep = ',')
+long_species <- read.delim("/Users/j.l.tung/GitHub/itsjesstung/Kp-maternal-vaccine-neonatal-sepsis/metaphlan4/long_species.csv", header = TRUE, sep = ',')
+```
+
+# Clean up MetaPhlAn4 long data tables
+```{r}
+# Remove "_profile_taxa" suffix from all values in the "Sample" column
+long_phyla$Sample   <- gsub("_profile_phyla$",   "", long_phyla$Sample)
+long_class$Sample   <- gsub("_profile_class$",   "", long_class$Sample)
+long_order$Sample   <- gsub("_profile_order$",   "", long_order$Sample)
+long_family$Sample  <- gsub("_profile_family$",  "", long_family$Sample)
+long_genus$Sample   <- gsub("_profile_genus$",   "", long_genus$Sample)
+long_species$Sample <- gsub("_profile_species$", "", long_species$Sample)
+
+# Remove taxonomic prefix from all "Taxa" columns
+long_phyla$Phyla     <- gsub("^p__", "", long_phyla$Phyla)
+long_class$Class     <- gsub("^c__", "", long_class$Class)
+long_order$Order     <- gsub("^o__", "", long_order$Order)
+long_family$Family   <- gsub("^f__", "", long_family$Family)
+long_genus$Genus     <- gsub("^g__", "", long_genus$Genus)
+long_species$Species <- gsub("^s__", "", long_species$Species)
+
+# Group all genome bins as "unclassified genome bins"
+long_class$Class     <- ifelse(grepl("^CFGB",     long_class$Class),     "Unclassified CFGBs", long_class$Class)
+long_order$Order     <- ifelse(grepl("^OFGB",     long_order$Order),     "Unclassified OFGBs", long_order$Order)
+long_family$Family   <- ifelse(grepl("^FGB",      long_family$Family),   "Unclassified FGBs",  long_family$Family)
+long_genus$Genus     <- ifelse(grepl("^GGB",      long_genus$Genus),     "Unclassified GGBs",  long_genus$Genus)
+long_species$Species <- ifelse(grepl("^GGB|^SGB", long_species$Species), "Unclassified SGBs",  long_species$Species)
+
+# Collapse grouped genome bins by summing abundances
+long_class <- long_class |>
+  dplyr::group_by(Sample, Class) |>
+  dplyr::summarise(Abundance = sum(Abundance), .groups = "drop")
+
+long_order <- long_order |>
+  dplyr::group_by(Sample, Order) |>
+  dplyr::summarise(Abundance = sum(Abundance), .groups = "drop")
+
+long_family <- long_family |>
+  dplyr::group_by(Sample, Family) |>
+  dplyr::summarise(Abundance = sum(Abundance), .groups = "drop")
+
+long_genus <- long_genus |>
+  dplyr::group_by(Sample, Genus) |>
+  dplyr::summarise(Abundance = sum(Abundance), .groups = "drop")
+
+long_species <- long_species |>
+  dplyr::group_by(Sample, Species) |>
+  dplyr::summarise(Abundance = sum(Abundance), .groups = "drop")
+```
+
+# Define global labels and palette
+```{r}
+sample_labels <- c("KF30_64_KVE_old_CD1_conventional_stool_240319" = "Old",
+                   "KF30_65_KVE_new_CD1_conventional_stool_240319" = "New")
+
+cbPalette <- c("#CC79A7", "#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00")
+
+phyla_labels <- c(
+  "Bacteria_unclassified" = "Unclassified bacteria"
+)
+
+class_labels <- c(
+  "Bacillota_unclassified" = "Bacillota (unclassified)",
+  "Bacteria_unclassified"  = "Bacteria (unclassified)"
+)
+
+order_labels <- c(
+  "Bacteria_unclassified"   = "Unclassified bacteria",
+  "Clostridia_unclassified" = "Clostridia (unclassified)",
+  "Bacillota_unclassified"  = "Bacillota (unclassified)"
+)
+
+family_labels <- c(
+  "Bacillota_unclassified"                   = "Bacillota (unclassified)",
+  "Bacteria_unclassified"                    = "Unclassified bacteria",
+  "Clostridia_unclassified"                  = "Clostridia (unclassified)",
+  "Eubacteriales_Family_XIII_Incertae_Sedis" = "Eubacteriales Family XIII (incertae sedis)",
+  "Erysipelotrichales_unclassified"          = "Erysipelotrichales (unclassified)",
+  "Eubacteriales_unclassified"               = "Eubacteriales (unclassified)"
+)
+
+genus_labels <- c(
+  "Bacteria_unclassified"            = "Unclassified bacteria",
+  "Bittarella_ex_Durand_et_al_2017"  = "Bittarella (Durand et al. 2017)",
+  "Clostridia_unclassified"          = "Clostridia (unclassified)",
+  "Clostridiaceae_unclassified"      = "Clostridiaceae (unclassified)",
+  "Erysipelotrichaceae_unclassified" = "Erysipelotrichaceae (unclassified)",
+  "Erysipelotrichales_unclassified"  = "Erysipelotrichales (unclassified)",
+  "Eubacteriaceae_unclassified"      = "Eubacteriaceae (unclassified)",
+  "Lachnospiraceae_unclassified"     = "Lachnospiraceae (unclassified)",
+  "Oscillospiraceae_unclassified"    = "Oscillospiraceae (unclassified)",
+  "Candidatus_Arthromitus"           = "Candidatus Arthromitus",
+  "Bacillota_unclassified"           = "Bacillota (unclassified)"
+)
+
+species_labels <- c(
+  "Acetatifactor_aquisgranensis"                 = "Acetatifactor aquisgranensis",
+  "Achromobacter_insuavis"                       = "Achromobacter insuavis",
+  "Adlercreutzia_equolifaciens"                  = "Adlercreutzia equolifaciens",
+  "Akkermansia_muciniphila"                      = "Akkermansia muciniphila",
+  "Anaerocaecibacter_muris"                      = "Anaerocaecibacter muris",
+  "Anaerostipes_hominis_ex_Lee_et_al_2021"       = "Anaerostipes hominis (Lee et al., 2021)",
+  "Anaerotruncus_colihominis"                    = "Anaerotruncus colihominis",
+  "Anaerotruncus_sp_1XD42_93"                    = "Anaerotruncus sp 1XD42_93",
+  "Bacillota_unclassified_SGB43543"              = "Bacillota unclassified SGB43543",
+  "Bacillota_unclassified_SGB43546"              = "Bacillota unclassified SGB43546",
+  "Bacillota_unclassified_SGB43550"              = "Bacillota unclassified SGB43550",
+  "Bacillota_unclassified_SGB63211"              = "Bacillota unclassified SGB63211",
+  "bacterium_1XD42_54"                           = "Bacterium 1XD42_54",
+  "bacterium_1XD8_76"                            = "Bacterium 1XD8_76",
+  "bacterium_210917_DFI_7_65"                    = "Bacterium 210917_DFI_7_65",
+  "Bittarella_massiliensis_ex_Durand_et_al_2017" = "Bittarella massiliensis (Durand et al., 2017)",
+  "Brevundimonas_nasdae"                         = "Brevundimonas nasdae",
+  "Candidatus_Arthromitus_sp_SFB_mouse"          = "Candidatus Arthromitus sp SFB_mouse",
+  "Clostridia_bacterium"                         = "Clostridia bacterium",
+  "Clostridia_unclassified_SGB59068"             = "Clostridia unclassified SGB59068",
+  "Clostridiaceae_bacterium"                     = "Clostridiaceae bacterium",
+  "Clostridiaceae_unclassified_SGB41663"         = "Clostridiaceae unclassified SGB41663",
+  "Clostridium_innocuum"                         = "Clostridium innocuum",
+  "Clostridium_SGB65123"                         = "Clostridium SGB65123",
+  "Clostridium_symbiosum"                        = "Clostridium symbiosum",
+  "Enterocloster_bolteae"                        = "Enterocloster bolteae",
+  "Enterocloster_lavalensis"                     = "Enterocloster lavalensis",
+  "Enterococcus_faecalis"                        = "Enterococcus faecalis",
+  "Erysipelotrichales_bacterium"                 = "Erysipelotrichales bacterium",
+  "Eubacteriaceae_bacterium"                     = "Eubacteriaceae bacterium",
+  "Eubacterium_sp_14_2"                          = "Eubacterium sp 14_2",
+  "Faecalicatena_contorta"                       = "Faecalicatena contorta",
+  "Lachnospiraceae_bacterium"                    = "Lachnospiraceae bacterium",
+  "Lachnospiraceae_bacterium_A2"                 = "Lachnospiraceae bacterium A2",
+  "Lachnospiraceae_bacterium_A4"                 = "Lachnospiraceae bacterium A4",
+  "Lachnospiraceae_bacterium_MD335"              = "Lachnospiraceae bacterium MD335",
+  "Lachnospiraceae_unclassified_SGB41424"        = "Lachnospiraceae unclassified SGB41424",
+  "Lachnospiraceae_unclassified_SGB41500"        = "Lachnospiraceae unclassified SGB41500",
+  "Lachnospiraceae_unclassified_SGB41589"        = "Lachnospiraceae unclassified SGB41589",
+  "Lachnospiraceae_unclassified_SGB41677"        = "Lachnospiraceae unclassified SGB41677",
+  "Lachnospiraceae_unclassified_SGB7271"         = "Lachnospiraceae unclassified SGB7271",
+  "Lactobacillus_intestinalis"                   = "Lactobacillus intestinalis",
+  "Lentihominibacter_hominis"                    = "Lentihominibacter hominis",
+  "Ligilactobacillus_murinus"                    = "Ligilactobacillus murinus",
+  "Merdimmobilis_hominis"                        = "Merdimmobilis hominis",
+  "Mucispirillum_schaedleri"                     = "Mucispirillum schaedleri",
+  "Muribaculum_gordoncarteri"                    = "Muribaculum gordoncarteri",
+  "Oscillibacter_SGB102176"                      = "Oscillibacter SGB102176",
+  "Oscillibacter_SGB43496"                       = "Oscillibacter SGB43496",
+  "Oscillibacter_SGB43502"                       = "Oscillibacter SGB43502",
+  "Oscillibacter_SGB63228"                       = "Oscillibacter SGB63228",
+  "Oscillibacter_SGB63230"                       = "Oscillibacter SGB63230",
+  "Oscillibacter_sp_CU971"                       = "Oscillibacter sp CU971",
+  "Oscillospiraceae_bacterium"                   = "Oscillospiraceae bacterium",
+  "Oscillospiraceae_unclassified_SGB102175"      = "Oscillospiraceae unclassified SGB102175",
+  "Otoolea_muris"                                = "Otoolea muris",
+  "Parabacteroides_goldsteinii"                  = "Parabacteroides goldsteinii",
+  "Romboutsia_ilealis"                           = "Romboutsia ilealis",
+  "Roseburia_sp_1XD42_69"                        = "Roseburia sp 1XD42_69",
+  "Ruthenibacterium_lactatiformans"              = "Ruthenibacterium lactatiformans",
+  "Schaedlerella_arabinosiphila"                 = "Schaedlerella arabinosiphila",
+  "Sporofaciens_musculi"                         = "Sporofaciens musculi",
+  "Staphylococcus_nepalensis"                    = "Staphylococcus nepalensis",
+  "Thomasclavelia_cocleata"                      = "Thomasclavelia cocleata"
+)
+
+# Shared theme
+base_theme <- theme_minimal(base_size = 16) +
+  theme(
+    axis.text.x          = element_text(hjust = 0.5, margin = margin(t = 10)),
+    axis.text.y          = element_text(margin = margin(r = 5)),
+    axis.ticks           = element_line(),
+    axis.ticks.length    = unit(0.2, "cm"),
+    panel.border         = element_rect(color = "gray", fill = NA, linewidth = 1),
+    legend.key.spacing.y = unit(0.02, "cm"),
+    legend.key.size      = unit(0.4, "cm"),
+    legend.text          = element_text(size = 12)
+  )
+```
+
+## Plot individual sample abundances at each taxonomic level
+# Plot phyla abundance and save graph as .png
+```{r}
+ggplot(long_phyla[long_phyla$Abundance > 0, ],
+       aes(x = Sample, y = Abundance, fill = Phyla)) +
+  geom_col(width = 0.75) +
+  scale_x_discrete(labels = sample_labels) +
+  scale_fill_discrete(labels = phyla_labels) +
+  labs(x = "Pre-experiment dam stool", y = "Relative abundance (%)") +
+  guides(fill = guide_legend(ncol = 1)) +
+  base_theme
+
+ggsave("long_phyla.png",
+       path = "/Users/j.l.tung/Desktop/KV_neonatalsepsis/metaphlan4/",
+       width = 9, height = 12, units = "in", dpi = 800, bg = "white")
+```
+
+# Plot class abundance and save graph as .png
+```{r}
+ggplot(long_class[long_class$Abundance > 0, ],
+       aes(x = Sample, y = Abundance, fill = Class)) +
+  geom_col(width = 0.75) +
+  scale_x_discrete(labels = sample_labels) +
+  scale_fill_discrete(labels = class_labels) +
+  labs(x = "Pre-experiment dam stool", y = "Relative abundance (%)") +
+  guides(fill = guide_legend(ncol = 1)) +
+  base_theme
+
+ggsave("long_class.png",
+       path = "/Users/j.l.tung/Desktop/KV_neonatalsepsis/metaphlan4/",
+       width = 9, height = 12, units = "in", dpi = 800, bg = "white")
+```
+
+# Plot order abundance and save graph as .png
+```{r}
+ggplot(long_order[long_order$Abundance > 0, ],
+       aes(x = Sample, y = Abundance, fill = Order)) +
+  geom_col(width = 0.75) +
+  scale_x_discrete(labels = sample_labels) +
+  scale_fill_discrete(labels = order_labels) +
+  labs(x = "Pre-experiment dam stool", y = "Relative abundance (%)") +
+  guides(fill = guide_legend(ncol = 1)) +
+  base_theme
+
+ggsave("long_order.png",
+       path = "/Users/j.l.tung/Desktop/KV_neonatalsepsis/metaphlan4/",
+       width = 9, height = 12, units = "in", dpi = 800, bg = "white")
+```
+
+# Plot family abundance and save graph as .png
+```{r}
+ggplot(long_family[long_family$Abundance > 0, ],
+       aes(x = Sample, y = Abundance, fill = Family)) +
+  geom_col(width = 0.75) +
+  scale_x_discrete(labels = sample_labels) +
+  scale_fill_discrete(labels = family_labels) +
+  labs(x = "Pre-experiment dam stool", y = "Relative abundance (%)") +
+  guides(fill = guide_legend(ncol = 1)) +
+  base_theme
+
+ggsave("long_family.png",
+       path = "/Users/j.l.tung/Desktop/KV_neonatalsepsis/metaphlan4/",
+       width = 9, height = 12, units = "in", dpi = 800, bg = "white")
+```
+
+# Plot genus abundance and save graph as .png
+```{r}
+ggplot(long_genus[long_genus$Abundance > 0, ],
+       aes(x = Sample, y = Abundance, fill = Genus)) +
+  geom_col(width = 0.75) +
+  scale_x_discrete(labels = sample_labels) +
+  scale_fill_discrete(labels = genus_labels) +
+  labs(x = "Pre-experiment dam stool", y = "Relative abundance (%)") +
+  guides(fill = guide_legend(ncol = 1)) +
+  base_theme
+
+ggsave("long_genus.png",
+       path = "/Users/j.l.tung/Desktop/KV_neonatalsepsis/metaphlan4/",
+       width = 9, height = 12, units = "in", dpi = 800, bg = "white")
+```
+
+# Plot species abundance and save graph as .png
+```{r}
+ggplot(long_species[long_species$Abundance > 0, ],
+       aes(x = Sample, y = Abundance, fill = Species)) +
+  geom_col(width = 0.75) +
+  scale_x_discrete(labels = sample_labels) +
+  scale_fill_discrete(labels = species_labels) +
+  labs(x = "Pre-experiment dam stool", y = "Relative abundance (%)") +
+  guides(fill = guide_legend(ncol = 1)) +
+  base_theme
+
+ggsave("long_species.png",
+       path = "/Users/j.l.tung/Desktop/KV_neonatalsepsis/metaphlan4/",
+       width = 9, height = 12, units = "in", dpi = 800, bg = "white")
+```
+
+## Calculate and plot average relative abundances by taxonomic level
+# Calculate average relative abundances by taxonomic level
+```{r}
+long_phyla_avg <- long_phyla %>%
+  group_by(Phyla) %>%
+  summarise(Abundance = mean(Abundance)) %>%
+  mutate(Sample = "N = 2")
+
+long_class_avg <- long_class %>%
+  group_by(Class) %>%
+  summarise(Abundance = mean(Abundance)) %>%
+  mutate(Sample = "N = 2")
+
+long_order_avg <- long_order %>%
+  group_by(Order) %>%
+  summarise(Abundance = mean(Abundance)) %>%
+  mutate(Sample = "N = 2")
+
+long_family_avg <- long_family %>%
+  group_by(Family) %>%
+  summarise(Abundance = mean(Abundance)) %>%
+  mutate(Sample = "N = 2")
+
+long_genus_avg <- long_genus %>%
+  group_by(Genus) %>%
+  summarise(Abundance = mean(Abundance)) %>%
+  mutate(Sample = "N = 2")
+
+long_species_avg <- long_species %>%
+  group_by(Species) %>%
+  summarise(Abundance = mean(Abundance)) %>%
+  mutate(Sample = "N = 2")
+```
+
+# Plot average relative abundances at phyla level
+```{r}
+ggplot(long_phyla_avg[long_phyla_avg$Abundance > 0, ],
+       aes(x = Sample, y = Abundance, fill = Phyla)) +
+  geom_col(width = 0.75) +
+  scale_x_discrete(labels = sample_labels) +
+  scale_fill_discrete(labels = phyla_labels) +
+  labs(x = "Pre-experiment dam stool", y = "Mean relative abundance (%)") +
+  guides(fill = guide_legend(ncol = 1)) +
+  base_theme
+
+ggsave("long_phyla_avg.png",
+       path = "/Users/j.l.tung/Desktop/KV_neonatalsepsis/metaphlan4/",
+       width = 9, height = 12, units = "in", dpi = 800, bg = "white")
+```
+
+# Plot average relative abundances at class level
+```{r}
+ggplot(long_class_avg[long_class_avg$Abundance > 0, ],
+       aes(x = Sample, y = Abundance, fill = Class)) +
+  geom_col(width = 0.75) +
+  scale_x_discrete(labels = sample_labels) +
+  scale_fill_discrete(labels = class_labels) +
+  labs(x = "Pre-experiment dam stool", y = "Mean relative abundance (%)") +
+  guides(fill = guide_legend(ncol = 1)) +
+  base_theme
+
+ggsave("long_class_avg.png",
+       path = "/Users/j.l.tung/Desktop/KV_neonatalsepsis/metaphlan4/",
+       width = 9, height = 12, units = "in", dpi = 800, bg = "white")
+```
+
+# Plot average relative abundances at order level
+```{r}
+ggplot(long_order_avg[long_order_avg$Abundance > 0, ],
+       aes(x = Sample, y = Abundance, fill = Order)) +
+  geom_col(width = 0.75) +
+  scale_x_discrete(labels = sample_labels) +
+  scale_fill_discrete(labels = order_labels) +
+  labs(x = "Pre-experiment dam stool", y = "Mean relative abundance (%)") +
+  guides(fill = guide_legend(ncol = 1)) +
+  base_theme
+
+ggsave("long_order_avg.png",
+       path = "/Users/j.l.tung/Desktop/KV_neonatalsepsis/metaphlan4/",
+       width = 9, height = 12, units = "in", dpi = 800, bg = "white")
+```
+
+# Plot average relative abundances at family level
+```{r}
+ggplot(long_family_avg[long_family_avg$Abundance > 0, ],
+       aes(x = Sample, y = Abundance, fill = Family)) +
+  geom_col(width = 0.75) +
+  scale_x_discrete(labels = sample_labels) +
+  scale_fill_discrete(labels = family_labels) +
+  labs(x = "Pre-experiment dam stool", y = "Mean relative abundance (%)") +
+  guides(fill = guide_legend(ncol = 1)) +
+  base_theme
+
+ggsave("long_family_avg.png",
+       path = "/Users/j.l.tung/Desktop/KV_neonatalsepsis/metaphlan4/",
+       width = 9, height = 12, units = "in", dpi = 800, bg = "white")
+```
+
+# Plot average relative abundances at genus level
+```{r}
+ggplot(long_genus_avg[long_genus_avg$Abundance > 0, ],
+       aes(x = Sample, y = Abundance, fill = Genus)) +
+  geom_col(width = 0.75) +
+  scale_x_discrete(labels = sample_labels) +
+  scale_fill_discrete(labels = genus_labels) +
+  labs(x = "Pre-experiment dam stool", y = "Mean relative abundance (%)") +
+  guides(fill = guide_legend(ncol = 1)) +
+  base_theme
+
+ggsave("long_genus_avg.png",
+       path = "/Users/j.l.tung/Desktop/KV_neonatalsepsis/metaphlan4/",
+       width = 9, height = 12, units = "in", dpi = 800, bg = "white")
+```
+
+# Plot average relative abundances at species level
+```{r}
+ggplot(long_species_avg[long_species_avg$Abundance > 0, ],
+       aes(x = Sample, y = Abundance, fill = Species)) +
+  geom_col(width = 0.75) +
+  scale_x_discrete(labels = sample_labels) +
+  scale_fill_discrete(labels = species_labels) +
+  labs(x = "Pre-experiment dam stool", y = "Mean relative abundance (%)") +
+  guides(fill = guide_legend(ncol = 1)) +
+  base_theme
+
+ggsave("long_species_avg.png",
+       path = "/Users/j.l.tung/Desktop/KV_neonatalsepsis/metaphlan4/",
+       width = 9, height = 12, units = "in", dpi = 800, bg = "white")
+```
+
+# For genus barplots, condense taxa with <5% or <1% mean relative abundance
+```{r}
+# Group genera <5% abundance into "Other"
+long_genus_avg_grouped5 <- long_genus_avg %>%
+  mutate(Genus = ifelse(Abundance < 5, "Other (abundance <5%)", Genus)) %>%
+  group_by(Sample, Genus) %>%
+  summarise(Abundance = sum(Abundance), .groups = "drop")
+
+genus_labels_5 <- c(genus_labels, "Other (abundance <5%)" = "Other (abundance <5%)")
+
+ggplot(long_genus_avg_grouped5[long_genus_avg_grouped5$Abundance > 0, ],
+       aes(x = Sample, y = Abundance, fill = Genus)) +
+  geom_col(width = 0.6) +
+  scale_x_discrete(labels = sample_labels) +
+  scale_fill_manual(values = cbPalette, labels = genus_labels_5) +
+  labs(x = "Pre-experiment dam stool", y = "Mean relative abundance (%)") +
+  guides(fill = guide_legend(ncol = 1)) +
+  base_theme
+
+ggsave("long_genus_avg_other5.png",
+       path = "/Users/j.l.tung/Desktop/KV_neonatalsepsis/metaphlan4/",
+       width = 9, height = 12, units = "in", dpi = 800, bg = "white")
+```
+```{r}
+# Group genera <1% abundance into "Other"
+long_genus_avg_grouped1 <- long_genus_avg %>%
+  mutate(Genus = ifelse(Abundance < 1, "Other", Genus)) %>%
+  group_by(Sample, Genus) %>%
+  summarise(Abundance = sum(Abundance), .groups = "drop")
+
+genus_labels_1 <- c(genus_labels, "Other" = "Other (abundance <1%)")
+
+ggplot(long_genus_avg_grouped1[long_genus_avg_grouped1$Abundance > 0, ],
+       aes(x = Sample, y = Abundance, fill = Genus)) +
+  geom_col(width = 0.6) +
+  scale_x_discrete(labels = sample_labels) +
+  scale_fill_manual(values = cbPalette, labels = genus_labels_1) +
+  labs(x = "Pre-experiment dam stool", y = "Mean relative abundance (%)") +
+  guides(fill = guide_legend(ncol = 1)) +
+  base_theme
+
+ggsave("long_genus_avg_other1.png",
+       path = "/Users/j.l.tung/Desktop/KV_neonatalsepsis/metaphlan4/",
+       width = 9, height = 12, units = "in", dpi = 800, bg = "white")
+```
